@@ -1,1 +1,413 @@
-# neseke-web
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Rulet Oyunu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+        }
+        .wheel-container {
+            position: relative;
+            width: 320px;
+            height: 320px;
+            margin: 0 auto;
+        }
+        @media (min-width: 640px) {
+            .wheel-container {
+                width: 380px;
+                height: 380px;
+            }
+        }
+        .roulette-wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.8), inset 0 0 20px rgba(255, 255, 255, 0.1);
+            border: 8px solid #334155;
+            transition: transform 4s cubic-bezier(0.15, 0.85, 0.15, 1);
+        }
+        .pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 14px solid transparent;
+            border-right: 14px solid transparent;
+            border-top: 26px solid #facc15;
+            z-index: 50;
+            filter: drop-shadow(0 3px 3px rgba(0,0,0,0.5));
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white">
+
+    <header class="w-full border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-gradient-to-tr from-indigo-600 to-violet-500 p-2.5 rounded-2xl shadow-lg shadow-indigo-500/20">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">Royal Rulet</h1>
+                    <p class="text-xs text-slate-400">Şansını dene, büyük ödülü kazan!</p>
+                </div>
+            </div>
+            
+            <!-- Balance Card -->
+            <div class="bg-slate-800/80 border border-slate-700/60 px-5 py-2.5 rounded-2xl flex items-center gap-4 shadow-inner">
+                <div>
+                    <span class="text-xs text-slate-400 block font-medium uppercase tracking-wider">Bakiye</span>
+                    <span id="balanceDisplay" class="text-xl font-black text-emerald-400 tracking-tight">1000</span> <span class="text-xs text-emerald-500 font-bold">Puan</span>
+                </div>
+                <button onclick="resetBalance()" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-xl transition font-medium border border-slate-600">Sıfırla / Yenile</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-8 flex flex-col items-center justify-center gap-8">
+
+        <!-- Notification Banner -->
+        <div id="notificationBox" class="w-full max-w-md hidden text-center px-4 py-3 rounded-2xl text-sm font-semibold transition-all shadow-lg"></div>
+
+        <!-- Wheel Display Section -->
+        <div class="relative py-4">
+            <div class="pointer"></div>
+            <div class="wheel-container">
+                <canvas id="rouletteCanvas" width="400" height="400" class="roulette-wheel"></canvas>
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div class="w-16 h-16 rounded-full bg-slate-900 border-4 border-slate-700 shadow-2xl flex items-center justify-center">
+                        <div class="w-4 h-4 rounded-full bg-amber-400 shadow-inner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Betting Controls Area -->
+        <div class="w-full max-w-xl bg-slate-900/80 border border-slate-800/80 p-6 rounded-3xl shadow-2xl backdrop-blur-md flex flex-col gap-6">
+            
+            <!-- Amount Input & Quick Buttons -->
+            <div class="flex flex-col gap-2">
+                <div class="flex justify-between items-center">
+                    <label for="betAmount" class="text-sm font-semibold text-slate-300">Bahis Miktarı</label>
+                    <span class="text-xs text-slate-500">Maks: <span id="maxBetSpan">1000</span></span>
+                </div>
+                <div class="flex gap-2">
+                    <div class="relative flex-1">
+                        <input type="number" id="betAmount" min="1" value="50" class="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3 text-white font-bold focus:outline-none focus:border-indigo-500 transition text-lg">
+                    </div>
+                    <button onclick="adjustBet(0.5)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold px-3 py-2 rounded-xl border border-slate-700 text-xs transition">1/2</button>
+                    <button onclick="adjustBet(2)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold px-3 py-2 rounded-xl border border-slate-700 text-xs transition">2X</button>
+                    <button onclick="setMaxBet()" class="bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 font-semibold px-3 py-2 rounded-xl border border-indigo-500/30 text-xs transition">MAX</button>
+                </div>
+            </div>
+
+            <!-- Color / Outcome Selection -->
+            <div class="flex flex-col gap-2">
+                <span class="text-sm font-semibold text-slate-300">Bahis Yapılacak Renk Seç</span>
+                <div class="grid grid-cols-3 gap-3">
+                    <!-- Red Button -->
+                    <button onclick="selectColor('red')" id="btnRed" class="color-btn border-2 border-red-600/50 bg-red-950/40 hover:bg-red-900/40 py-4 px-3 rounded-2xl flex flex-col items-center justify-center gap-1 transition group">
+                        <span class="w-4 h-4 rounded-full bg-red-600 shadow-lg shadow-red-600/50 group-hover:scale-110 transition"></span>
+                        <span class="font-bold text-red-400 text-sm">KIRMIZI</span>
+                        <span class="text-[10px] text-red-300/70 font-medium">2x Kazanç</span>
+                    </button>
+                    
+                    <!-- Black Button -->
+                    <button onclick="selectColor('black')" id="btnBlack" class="color-btn border-2 border-slate-600 bg-slate-900/60 hover:bg-slate-800/80 py-4 px-3 rounded-2xl flex flex-col items-center justify-center gap-1 transition group">
+                        <span class="w-4 h-4 rounded-full bg-slate-900 border border-slate-600 shadow-lg group-hover:scale-110 transition"></span>
+                        <span class="font-bold text-slate-200 text-sm">SİYAH</span>
+                        <span class="text-[10px] text-slate-400 font-medium">2x Kazanç</span>
+                    </button>
+
+                    <!-- Green Button -->
+                    <button onclick="selectColor('green')" id="btnGreen" class="color-btn border-2 border-emerald-600/50 bg-emerald-950/40 hover:bg-emerald-900/40 py-4 px-3 rounded-2xl flex flex-col items-center justify-center gap-1 transition group">
+                        <span class="w-4 h-4 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50 group-hover:scale-110 transition"></span>
+                        <span class="font-bold text-emerald-400 text-sm">YEŞİL</span>
+                        <span class="text-[10px] text-emerald-300/70 font-medium">35x Kazanç</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Spin / Play Button -->
+            <button id="spinBtn" onclick="spinWheel()" class="w-full bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-700 hover:from-indigo-500 hover:to-violet-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-600/30 transition transform active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-lg">
+                <svg class="w-6 h-6 animate-spin hidden" id="spinLoader" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span id="spinBtnText">ÇARKI ÇEVİR</span>
+            </button>
+        </div>
+
+        <!-- Rules & Multiplier Info Footer Card -->
+        <div class="w-full max-w-xl bg-slate-900/40 border border-slate-800/60 p-4 rounded-2xl text-xs text-slate-400 flex flex-col sm:flex-row justify-around gap-2 text-center">
+            <div>🔴 Kırmızı Dilimler: <strong class="text-red-400">2x</strong></div>
+            <div>⚫ Siyah Dilimler: <strong class="text-slate-300">2x</strong></div>
+            <div>🟢 Yeşil Dilim: <strong class="text-emerald-400">35x</strong></div>
+        </div>
+
+    </main>
+
+    <footer class="w-full py-4 text-center text-xs text-slate-600 border-t border-slate-900">
+        &copy; 2026 Modern Rulet Oyunu. Tüm hakları saklıdır.
+    </footer>
+
+    <script>
+        // Game state variables
+        let balance = 1000;
+        let selectedColor = 'red'; // default selection
+        let isSpinning = false;
+
+        // Roulette Wheel setup (European style wheel layout: 37 pockets total)
+        // 0 is green, others are red or black
+        const pockets = [
+            { id: 0, color: 'green', label: '0' },
+            { id: 32, color: 'red', label: '32' },
+            { id: 15, color: 'black', label: '15' },
+            { id: 19, color: 'red', label: '19' },
+            { id: 4, color: 'black', label: '4' },
+            { id: 21, color: 'red', label: '21' },
+            { id: 2, color: 'black', label: '2' },
+            { id: 25, color: 'red', label: '25' },
+            { id: 17, color: 'black', label: '17' },
+            { id: 34, color: 'red', label: '34' },
+            { id: 6, color: 'black', label: '6' },
+            { id: 27, color: 'red', label: '27' },
+            { id: 13, color: 'black', label: '13' },
+            { id: 36, color: 'red', label: '36' },
+            { id: 11, color: 'black', label: '11' },
+            { id: 30, color: 'red', label: '30' },
+            { id: 8, color: 'black', label: '8' },
+            { id: 23, color: 'red', label: '23' },
+            { id: 10, color: 'black', label: '10' },
+            { id: 5, color: 'red', label: '5' },
+            { id: 24, color: 'black', label: '24' },
+            { id: 16, color: 'red', label: '16' },
+            { id: 33, color: 'black', label: '33' },
+            { id: 1, color: 'red', label: '1' },
+            { id: 20, color: 'black', label: '20' },
+            { id: 14, color: 'red', label: '14' },
+            { id: 31, color: 'black', label: '31' },
+            { id: 9, color: 'red', label: '9' },
+            { id: 22, color: 'black', label: '22' },
+            { id: 18, color: 'red', label: '18' },
+            { id: 29, color: 'black', label: '29' },
+            { id: 7, color: 'red', label: '7' },
+            { id: 28, color: 'black', label: '28' },
+            { id: 12, color: 'red', label: '12' },
+            { id: 35, color: 'black', label: '35' },
+            { id: 3, color: 'red', label: '3' },
+            { id: 26, color: 'black', label: '26' }
+        ];
+
+        const canvas = document.getElementById('rouletteCanvas');
+        const ctx = canvas.getContext('2d');
+        let currentRotationAngle = 0;
+
+        // Draw wheel function
+        function drawWheel() {
+            const numSlices = pockets.length;
+            const arcSize = (2 * Math.PI) / numSlices;
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = canvas.width / 2 - 10;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let i = 0; i < numSlices; i++) {
+                const angle = i * arcSize;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, angle, angle + arcSize);
+                ctx.closePath();
+
+                // Color mapping
+                let colorHex = '#1e293b';
+                if (pockets[i].color === 'red') colorHex = '#dc2626';
+                else if (pockets[i].color === 'black') colorHex = '#0f172a';
+                else if (pockets[i].color === 'green') colorHex = '#059669';
+
+                ctx.fillStyle = colorHex;
+                ctx.fill();
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Draw labels
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(angle + arcSize / 2);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 11px Inter, sans-serif';
+                ctx.fillText(pockets[i].label, radius - 15, 4);
+                ctx.restore();
+            }
+        }
+
+        // Initialize user interface selections
+        function selectColor(color) {
+            if (isSpinning) return;
+            selectedColor = color;
+
+            // Remove active styles from all buttons
+            document.querySelectorAll('.color-btn').forEach(btn => {
+                btn.classList.remove('ring-4', 'ring-indigo-500/50', 'scale-[1.02]');
+            });
+
+            // Add active style to selected button
+            const activeBtn = document.getElementById(`btn${color.charAt(0).toUpperCase() + color.slice(1)}`);
+            if (activeBtn) {
+                activeBtn.classList.add('ring-4', 'ring-indigo-500/50', 'scale-[1.02]');
+            }
+        }
+
+        function adjustBet(multiplier) {
+            const input = document.getElementById('betAmount');
+            let val = parseInt(input.value) || 0;
+            val = Math.floor(val * multiplier);
+            if (val < 1) val = 1;
+            if (val > balance) val = balance;
+            input.value = val;
+        }
+
+        function setMaxBet() {
+            const input = document.getElementById('betAmount');
+            input.value = balance > 0 ? balance : 1;
+        }
+
+        function updateDisplay() {
+            document.getElementById('balanceDisplay').textContent = balance;
+            document.getElementById('maxBetSpan').textContent = balance;
+        }
+
+        function showNotification(message, type) {
+            const box = document.getElementById('notificationBox');
+            box.textContent = message;
+            box.classList.remove('hidden', 'bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30', 'bg-red-500/20', 'text-red-400', 'border-red-500/30', 'bg-indigo-500/20', 'text-indigo-300', 'border-indigo-500/30');
+            
+            if (type === 'win') {
+                box.classList.add('bg-emerald-500/20', 'text-emerald-300', 'border', 'border-emerald-500/30');
+            } else if (type === 'lose') {
+                box.classList.add('bg-red-500/20', 'text-red-300', 'border', 'border-red-500/30');
+            } else {
+                box.classList.add('bg-indigo-500/20', 'text-indigo-300', 'border', 'border-indigo-500/30');
+            }
+        }
+
+        function resetBalance() {
+            if (isSpinning) return;
+            balance = 1000;
+            updateDisplay();
+            showNotification('Bakiye 1000 puana sıfırlandı!', 'info');
+        }
+
+        // Spin wheel action
+        function spinWheel() {
+            if (isSpinning) return;
+
+            const betInput = document.getElementById('betAmount');
+            const betAmount = parseInt(betInput.value);
+
+            if (isNaN(betAmount) || betAmount <= 0) {
+                showNotification('Lütfen geçerli bir bahis miktarı girin!', 'lose');
+                return;
+            }
+
+            if (betAmount > balance) {
+                showNotification('Bakiyeniz bu bahis için yetersiz!', 'lose');
+                return;
+            }
+
+            // Deduct balance
+            balance -= betAmount;
+            updateDisplay();
+
+            isSpinning = true;
+            const spinBtn = document.getElementById('spinBtn');
+            const spinLoader = document.getElementById('spinLoader');
+            const spinBtnText = document.getElementById('spinBtnText');
+
+            spinBtn.disabled = true;
+            spinLoader.classList.remove('hidden');
+            spinBtnText.textContent = 'Çark Dönüyor...';
+            showNotification('Çark çevriliyor, şansınız bol olsun!', 'info');
+
+            // Pick random winning pocket index
+            const winningIndex = Math.floor(Math.random() * pockets.length);
+            const numSlices = pockets.length;
+            const sliceDegree = 360 / numSlices;
+
+            // Calculate precise rotation to land the winning pocket at the top pointer
+            // Pointer is at the top (0 degrees). Each slice occupies sliceDegree.
+            const targetAngleFromTop = winningIndex * sliceDegree + sliceDegree / 2;
+            const extraSpins = 5 + Math.floor(Math.random() * 4); // 5 to 8 full rotations
+            const totalRotation = currentRotationAngle + (360 * extraSpins) + (360 - (currentRotationAngle % 360)) - targetAngleFromTop;
+
+            currentRotationAngle = totalRotation;
+            canvas.style.transform = `rotate(${currentRotationAngle}deg)`;
+
+            // Wait for animation to finish (4 seconds transition)
+            setTimeout(() => {
+                const winningPocket = pockets[winningIndex];
+                let wonAmount = 0;
+                let isWin = false;
+
+                // Win check rules
+                if (winningPocket.color === selectedColor) {
+                    isWin = true;
+                    const multiplier = winningPocket.color === 'green' ? 35 : 2;
+                    wonAmount = betAmount * multiplier;
+                    balance += wonAmount;
+                }
+
+                updateDisplay();
+
+                // Build result notification
+                let colorNameTr = winningPocket.color === 'red' ? 'Kırmızı' : (winningPocket.color === 'black' ? 'Siyah' : 'Yeşil');
+                if (isWin) {
+                    showNotification(`Tebrikler! Kazanan: ${winningPocket.label} (${colorNameTr}). ${wonAmount} puan kazandın!`, 'win');
+                } else {
+                    showNotification(`Kazanan: ${winningPocket.label} (${colorNameTr}). Maalesef kaybettin!`, 'lose');
+                }
+
+                isSpinning = false;
+                spinBtn.disabled = false;
+                spinLoader.classList.add('hidden');
+                spinBtnText.textContent = 'ÇARKI ÇEVİR';
+
+            }, 4000);
+        }
+
+        // Initial setup
+        window.onload = function () {
+            drawWheel();
+            selectColor('red');
+            updateDisplay();
+        };
+    </script>
+</body>
+</html>
